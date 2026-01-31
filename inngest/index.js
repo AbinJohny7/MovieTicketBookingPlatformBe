@@ -50,39 +50,28 @@ const syncUserUpdation=inngest.createFunction(
     }
 ) 
 // innget sunction to cancel booking and release seat for 10min
-const releaseSeatsAndDeleteBooking = inngest.createFunction(
-  { id: 'release-seats-delete-booking' },
-  { event: 'app/checkpayment' },
-  async ({ event, step }) => {
-    const tenMinutesLater = new Date(Date.now() + 10 * 60 * 1000);
-
-    await step.sleepUntil('wait-for-10-minutes', tenMinutesLater);
-
-    await step.run('check-payment-status', async () => {
-      const bookingId = event?.data?.bookingId;
-      if (!bookingId) return; // 🛑 event was malformed
-
-      const booking = await Booking.findById(bookingId);
-
-      // 🛑 THESE GUARDS MUST COME FIRST
-      if (!booking) return;
-      if (booking.isPaid === true) return;
-
-      const show = await Show.findById(booking.show);
-      if (!show) return;
-
-      booking.bookedSeats.forEach(seat => {
-        delete show.occupiedSeats[seat];
-      });
-
-      show.markModified("occupiedSeats");
-      await show.save();
-
-      await Booking.findByIdAndDelete(bookingId);
-    });
-  }
-);
-
+const releaseSeatsAndDeleteBooking=inngest.createFunction(
+    {id:'release-seats-delete-booking'},
+    {event:"app/checkpayment"},
+    async ({event,step}) => {
+        const tenMinutesLater=new Date(Date.now()+ 10 * 60 * 1000)
+        await step.sleepUntil('wait-for-10-minutes',tenMinutesLater)
+        await step.run('check-payment-status',async () => {
+            const bookingId=event.data.bookingId
+            const booking=await Booking.findById(bookingId)
+            // if payment is not made,release seats and delete booking
+            if(!booking.isPaid){
+                const show=await Show.findById(booking.show)
+                booking.bookedSeats.forEach((seat)=>{
+                    delete show.occupiedSeats[seat]
+                })
+                show.markModified('occupiedSeats')
+                await show.save()
+                await Booking.findByIdAndDelete(booking._id)
+            }
+        })
+    }
+)
 
 
 
